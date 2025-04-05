@@ -15,7 +15,7 @@ color_lower = (85, 42, 203)
 pts = deque(maxlen=64)
 vs = VideoStream(src=1).start()
 
-N = 30
+N = 10
 dataList = []
 data = []
 targets = []
@@ -52,8 +52,8 @@ while True:
             data = []
             step = 0
 
-            # target = input('Enter distance: ')
-            # targets.append(target)
+            target = input('Enter distance: ')
+            targets.append(target)
 
 
         if radius > 10:
@@ -79,4 +79,4 @@ cv2.destroyAllWindows()
 
 df = pd.DataFrame({"data" : dataList, "target": targets})
 print(df)
-df.to_csv('test.csv', mode='a', header=False)
+df.to_csv('dataset.csv', mode='a', header=False)
