@@ -2,8 +2,7 @@ from collections import deque
 from imutils.video import VideoStream
 from joblib import load
 
-from model import MLP
-
+from model import RNN_Model, Modified_ResNet
 import numpy as np
 import pandas as pd
 import cv2
@@ -12,13 +11,26 @@ import time
 import serial
 
 import torch
+import torch.nn as nn
 
-def run_prediction(model, sc, data):
-    data = np.asarray(data, dtype=np.float32)
-    data = sc.transform(data.reshape(1, -1))
-
+def run_prediction(model, data):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    return round(model(torch.tensor(data).to(device)).item())
+    data = torch.tensor(data, dtype=torch.float32).to(device)
+    data = nn.functional.normalize(data)
+    data = data.view(1, 10, 3)
+
+    return round(model(data).item() * 100)
+
+def run_CNN_prediction(model, data):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    data = torch.tensor(data, dtype=torch.float32).to(device)
+    data = data.unsqueeze(0)
+
+    outputs = model(data)
+    predicted = torch.softmax(outputs, dim=1)
+    predicted = torch.argmax(predicted, dim=1)
+
+    return int(predicted.item())
 
 def send_instruction(instruction, ser):
     
@@ -39,14 +51,13 @@ def send_instruction(instruction, ser):
 
 
 # BLUE ping pong ball
-color_upper = (149, 255, 255)
-color_lower = (35, 95, 144)
+color_upper = (99, 255, 255)
+color_lower = (49, 92, 118)
 
 pts = deque(maxlen=64)
-vs = VideoStream(src=1).start()
+vs = VideoStream(src=0).start()
 
-model = torch.load("model.pth", weights_only=False)
-sc = load('std_scaler.bin')
+model = torch.load("Modified_ResNet.pth", weights_only=False)
 
 N = 10
 data = []
@@ -79,11 +90,11 @@ while True:
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
         
         if radius > 7.5:
-            data.extend([center[0], center[1], radius])
+            data.append([center[0], center[1], radius])
             step += 1
 
         if step == N:
-            prediction = run_prediction(model, sc, data)
+            prediction = run_CNN_prediction(model, data)
             send_instruction(prediction, serial_port)
             
             data = []
